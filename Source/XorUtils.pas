@@ -20,6 +20,7 @@ type
   TXorableOrdinal = Int64;
 
   TBufferElement = TXorableOrdinal;
+  PBufferElement = ^TBufferElement;
   TBuffer = array of TBufferElement;
 
   TKeyElement = TXorableOrdinal;
@@ -67,7 +68,7 @@ begin
     Result := Min(Result, Count);
 end;
 
-function XorElement(Element : TBufferElement; const Key : TKey) : TBufferElement; inline;
+function XorElement(Element : TBufferElement; const Key : TKey) : TBufferElement; {$IFNDEF DEBUG}inline;{$ENDIF}
 var
   i : Integer;
 begin
@@ -76,22 +77,34 @@ begin
     Result := Result xor Key[i];
 end;
 
-procedure XorBuffer(const Input : TBuffer; Count : Integer; const Key : TKey; const Output : TBytes); inline;
+procedure XorBuffer(const Input : TBuffer; Count : Integer; const Key : TKey; const Output : TBytes); {$IFNDEF DEBUG}inline;{$ENDIF}
 var
-  iOutputOffset, i : Integer;
+  iElementCount, iRemainderSize, iOutputOffset, i : Integer;
   XoredElement : TBufferElement;
+  pRemainder : PBufferElement;
 begin
-  iOutputOffset := 0;
+  iElementCount  := Count div BUFFER_ELEMENT_SIZE;
+  iRemainderSize := Count mod BUFFER_ELEMENT_SIZE;
+  iOutputOffset  := 0;
 
-  for i := 0 to Count div BUFFER_ELEMENT_SIZE do
+  for i := 0 to iElementCount - 1 do
   begin
     XoredElement := XorElement(Input[i], Key);
     Move(XoredElement, Output[iOutputOffset], BUFFER_ELEMENT_SIZE);
     Inc(iOutputOffset, BUFFER_ELEMENT_SIZE);
   end;
 
-  if Count mod BUFFER_ELEMENT_SIZE > 0 then
-    // TODO: handle insufficient or remaining bytes
+  if iRemainderSize > 0 then
+  begin
+    FillChar(XoredElement, BUFFER_ELEMENT_SIZE, 0);
+
+    pRemainder := @Input[0];
+    Inc(pRemainder, iElementCount);
+    Move(pRemainder^, XoredElement, iRemainderSize);
+
+    XoredElement := XorElement(XoredElement, Key);
+    Move(XoredElement, Output[iOutputOffset], iRemainderSize);
+  end;
 end;
 
 procedure XorData(Input : TStream; Count : Int64; const Buffer : TBuffer;
