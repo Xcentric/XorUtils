@@ -55,10 +55,29 @@ end;
 function CreateKey(const Key : String) : TKey;
 var
   iKeySize : Integer;
+  {$IFDEF UNICODE}
+  RawKeyBytes, SignificantKeyBytes : TBytes;
+  KeyByte : Byte;
+  {$ENDIF}
 begin
   iKeySize := Length(Key) * SizeOf(Char);
+
+  {$IFDEF UNICODE}
+  SetLength(RawKeyBytes, iKeySize);
+  SetLength(SignificantKeyBytes, iKeySize);
+
+  Move(Key[1], RawKeyBytes[0], iKeySize);
+  iKeySize := 0;
+  for KeyByte in RawKeyBytes do
+    if KeyByte <> 0 then
+    begin
+      SignificantKeyBytes[iKeySize] := KeyByte;
+      Inc(iKeySize);
+    end;
+  {$ENDIF}
+
   SetLength(Result, iKeySize div KEY_ELEMENT_SIZE + 1);
-  Move(Key[1], Result[0], iKeySize);
+  Move({$IFDEF UNICODE}SignificantKeyBytes[0]{$ELSE}Key[1]{$ENDIF}, Result[0], iKeySize);
 end;
 
 function GetActualCount(Input : TStream; Count : Int64) : Int64;
